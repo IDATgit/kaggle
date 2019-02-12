@@ -1,0 +1,8 @@
+# Pycharm junk
+*.idea
+# All input not included in git, except ones mentions explicitly
+input/*
+!input/train/train.csv
+!input/*_labels.csv
+
+
