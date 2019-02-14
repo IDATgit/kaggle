@@ -5,6 +5,7 @@ import seaborn as sns
 import os
 import sklearn
 import models
+import feature_engineering
 from quadratic_kappa import quadratic_weighted_kappa
 
 full_data = pd.read_csv("../input/train/train.csv")
@@ -12,10 +13,11 @@ full_data = pd.read_csv("../input/train/train.csv")
 
 Y = full_data.AdoptionSpeed
 X = full_data.drop(columns=["AdoptionSpeed", "RescuerID", "PetID", "VideoAmt"])
-print(X.columns)
-X_base = X.drop(columns=["Name", "Description"])
+X = feature_engineering.feature_engineer(X)
 
-model_history = models.lgbm_classify(X_base, Y)
+X_base = X.drop(columns=["Description"])
+
+model_history = models.lgbm_regress(X_base, Y)
 
 fig, axes = plt.subplots(2)
 

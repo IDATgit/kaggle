@@ -21,7 +21,8 @@ def kappa_objective(preds, train_data):
 
 CAT_FEATS = ['Type', 'Breed1', 'Breed2', 'Gender', 'Color1', 'Color2',
              'Color3', 'MaturitySize', 'Vaccinated', 'Dewormed',
-             'Sterilized', 'Health', 'Quantity', 'State']
+             'Sterilized', 'Health', 'Quantity', 'State', 'name_type']
+
 def lgbm_regress(X, Y, cat_feats=CAT_FEATS):
     """
     This function learns lgbm using a rgressor. Should go through a rounder.
@@ -36,7 +37,7 @@ def lgbm_regress(X, Y, cat_feats=CAT_FEATS):
         #"early_stopping_round" : 10,
         "learning_rate" : 0.01,
         "metric" : "l2",
-        "num_iterations" : 5000
+        "num_iterations" : 1000
     }
     return lgbm.cv(params, data, categorical_feature=cat_feats, feval=kappa_objective, nfold=10)
 
