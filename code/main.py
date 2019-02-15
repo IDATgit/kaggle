@@ -15,9 +15,7 @@ Y = full_data.AdoptionSpeed
 X = full_data.drop(columns=["AdoptionSpeed", "RescuerID", "PetID", "VideoAmt"])
 X = feature_engineering.feature_engineer(X)
 
-X_base = X.drop(columns=["Description"])
-
-model_history = models.lgbm_regress(X_base, Y)
+model_history = models.lgbm_regress(X, Y)
 
 fig, axes = plt.subplots(2)
 
