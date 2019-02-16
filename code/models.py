@@ -1,8 +1,11 @@
 import lightgbm as lgbm
 import numpy as np
-from quadratic_kappa import quadratic_weighted_kappa
+import sklearn as sk
+import xgboost as xg
 
-def quantizer(samples, thresholds):
+loss = "l2-rounded"
+
+def quantizer(samples, thresholds=[.5, 1.5, 2.5, 3.5]):
     """
     :param samples: the samples to quantize
     :param thresholds: Thresholds to quantize in
@@ -15,47 +18,49 @@ def quantizer(samples, thresholds):
                                  2, thresholds[2], 3, thresholds[3], 4])//2)
 
 
-def kappa_objective(preds, train_data):
-    return "kappa", quadratic_weighted_kappa(train_data.get_label(), quantizer(preds, [.5, 1.5, 2.5, 3.5])), True
+def crazy_rounder(x, r=10):
+    """
+    This function is a simulatur of a smooth step function.
+    This function incrases sharply from 0 to 1 around 0.5, from 1 to 2 around 1.5 and so on.
+
+    :return: triple of f(x), f`(x), f``(x) where f is the smooth-step-function itself.
+    """
+    # used = np.where(x < 0, 0 , x)
+    c = np.exp(0.5 * r)
+    fractional, integral = np.modf(x)
+    erx = np.exp(r * fractional)
+    return (integral + erx / (c + erx),
+            c * r * erx / np.square(c + erx),
+            c * r * r * erx * (c - erx) / np.power(c + erx, 3))
 
 
-CAT_FEATS = ['Type', 'Breed1', 'Breed2', 'Gender', 'Color1', 'Color2',
-             'Color3', 'MaturitySize', 'Vaccinated', 'Dewormed',
-             'Sterilized', 'Health', 'Quantity', 'State']
-def lgbm_regress(X, Y, cat_feats=CAT_FEATS):
-    """
-    This function learns lgbm using a rgressor. Should go through a rounder.
-    :return: The cv of the algorithm
-    """
-    data = lgbm.Dataset(X, Y, categorical_feature=cat_feats)
+def ranked_classes_obj(preds, train_data):
+    y_hat = np.where(preds < 0, 0, preds)
+    y = train_data.get_label()
+    f_y_hat, df_y_hat, ddf_y_hat = crazy_rounder(y_hat)
+    # print("y_hat", y_hat)
+    grad = 2 * (f_y_hat - y) * df_y_hat
+    hessian = 2 * (ddf_y_hat * (f_y_hat - y) + np.square(df_y_hat))
+    # print("grad", grad)
+    # print("hessian", hessian)
+    return grad, hessian
+
+
+def kappa_loss(preds, train_data):
+    return "kappa", sk.metrics.cohen_kappa_score(train_data.get_label(), quantizer(preds), weights="quadratic")
+
+def l2_rounded_loss(preds, train_data):
+    return "l2-rounded", sk.metrics.mean_squared_error(preds, train_data.get_label())
+
+def xg_regress(X, Y):
+    data = xg.DMatrix(data=X, label=Y)
     params = {
-        "num_leaves" : 128,
-        "bagging_fraction" : 0.8,
-        "bagging_freq" : 2,
-        "feature_fraction" : 0.9,
-        #"early_stopping_round" : 10,
-        "learning_rate" : 0.01,
-        "metric" : "l2",
-        "num_iterations" : 5000
+        "eta" : 0.05,
+        "max_depth" : 6,
+        "min_child_weight" : 1,
+        "subsample" : 0.8
     }
-    return lgbm.cv(params, data, categorical_feature=cat_feats, feval=kappa_objective, nfold=10)
-
-def lgbm_classify(X, Y, cat_feats=CAT_FEATS):
-    """
-    This function learns lgbm using a rgressor. Should go through a rounder.
-    :return: The cv of the algorithm
-    """
-    data = lgbm.Dataset(X, Y, categorical_feature=cat_feats)
-    params = {
-        "objective" : "multiclass",
-        "num_class" : 5,
-        "num_leaves" : 128,
-        "bagging_fraction" : 0.8,
-        "bagging_freq" : 2,
-        "feature_fraction" : 0.9,
-        #"early_stopping_round" : 10,
-        "learning_rate" : 0.01,
-        "metric" : "l2",
-        "num_iterations" : 1000
-    }
-    return lgbm.cv(params, data, categorical_feature=cat_feats, feval=kappa_objective, nfold=10)
+    return xg.cv(params, data,
+          num_boost_round=100000,
+          nfold=3,
+          obj=ranked_classes_obj, feval=kappa_loss, maximize=True)
