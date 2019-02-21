@@ -41,10 +41,10 @@ XG_REGRESS_DEFAULT_PARAMS = {
         "subsample": 0.8,
         "lambda": 1,
         "gamma": 1,
-        "silent": 1,
-        # "verbosity": 0
+        # "silent": 1,
+        "verbosity": 0
     }
-def regress_cv(X, Y, alpha=0.08, r=15, max_depth=7s, subsample=0.6, gamma=1, eta=0.05, num_iters=1500):
+def regress_cv(X, Y, alpha=0.08, r=15, max_depth=7, subsample=0.6, gamma=1.5, eta=0.05, num_iters=1500):
     data = xg.DMatrix(data=X, label=Y)
 
     sub_obj = partial(hopeful_obj, alpha=alpha, r=r)
@@ -55,7 +55,7 @@ def regress_cv(X, Y, alpha=0.08, r=15, max_depth=7s, subsample=0.6, gamma=1, eta
     params["eta"] = eta
     return xg.cv(params, data,
                  num_boost_round=num_iters,
-                 nfold=4,
+                 nfold=3,
                  obj=sub_obj,
                  feval=kappa_loss,
                  maximize=True)
